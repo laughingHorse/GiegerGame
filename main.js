@@ -716,16 +716,4 @@ function getOverallExtents(){
   animate();
 })();
 
-// ==============================
-// Utility fns used earlier
-// ==============================
-function generateFloorTexture(){
-  const c = document.createElement('canvas'); c.width=256; c.height=256;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle="#f4f8fd"; ctx.fillRect(0,0,256,256);
-  for(let y=0;y<16;y++) for(let x=0;x<24;x++){
-    const v = (x+y)%2 ? 230: 240; ctx.fillStyle = `rgb(${v},${v+3},${v+8})`; ctx.fillRect(x*10,y*16,10,16);
-  }
-  for(let i=0;i<500;i++){ const x=Math.random()*256, y=Math.random()*256, a=Math.random()*0.12; ctx.fillStyle=`rgba(90,120,150,${a})`; ctx.fillRect(x,y,1,1); }
-  return c;
-}
+
