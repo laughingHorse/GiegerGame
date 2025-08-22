@@ -248,19 +248,7 @@
         "width": 2.4
       }
     },
-    {
-      "id": "09grzgf",
-      "name": "Room",
-      "x1": -10,
-      "z1": -14.5,
-      "x2": -10,
-      "z2": -14,
-      "door": {
-        "side": "south",
-        "pos": 0.5,
-        "width": 2.4
-      }
-    },
+
     {
       "id": "v2fiyja",
       "name": "Room 2",
