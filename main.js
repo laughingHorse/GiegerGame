@@ -644,12 +644,14 @@ function getLayoutUrl() {
   return q;                                    // e.g. layouts/mydept.json
 }
 
-async function loadAndBuildLayout(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('layout not found at ' + url);
+async function loadAndBuildLayout(url = 'layout.json') {
+  const sep = url.includes('?') ? '&' : '?';
+  const res = await fetch(`${url}${sep}v=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`layout not found at ${url}`);
   const layout = await res.json();
   buildLayoutFromJson(layout);
 }
+
 
 function buildLayoutFromJson(layout){
   // extents
@@ -760,6 +762,7 @@ function getOverallExtents(){
   seedScenario();
   animate();
 })();
+
 
 
 
