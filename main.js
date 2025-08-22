@@ -1,23 +1,22 @@
-// ------------------------------
+// ==============================
 // Imports
-// ------------------------------
+// ==============================
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 
-console.log('✅ main.js ready');
-
-// ------------------------------
-// DOM refs (expected in index.html)
-// ------------------------------
+// ==============================
+// DOM handles (expected in index.html)
+// ==============================
 const overlay   = document.getElementById('overlay');
 const startBtn  = document.getElementById('startBtn');
 const statusMsg = document.getElementById('statusMsg');
+const gaugeCanvas = document.getElementById('gauge');
 
-// ------------------------------
+// ==============================
 // Three.js setup
-// ------------------------------
+// ==============================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xeaf2fb); // clinic blue
+scene.background = new THREE.Color(0xeaf2fb); // clinic light blue
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -29,23 +28,25 @@ renderer.domElement.style.position = 'fixed';
 renderer.domElement.style.inset = '0';
 document.body.appendChild(renderer.domElement);
 
+const clock = new THREE.Clock();
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-const clock = new THREE.Clock();
 
 // Lights
 scene.add(new THREE.HemisphereLight(0xf2f7ff, 0xcfd6de, 0.9));
 const sun = new THREE.DirectionalLight(0xffffff, 0.65);
 sun.position.set(50, 80, 30);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024,1024);
+sun.shadow.mapSize.set(1024, 1024);
 scene.add(sun);
 
 // Floor (vinyl)
-const floorTex = new THREE.Texture(generateFloorTexture()); floorTex.needsUpdate = true;
+const floorTex = new THREE.Texture(generateFloorTexture());
+floorTex.needsUpdate = true;
 floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
 floorTex.repeat.set(11, 8);
 const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.96, metalness: 0 });
@@ -54,21 +55,24 @@ floor.rotation.x = -Math.PI/2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// ------------------------------
-// Collision + room registry
-// ------------------------------
+// ==============================
+// Geometry registries
+// ==============================
 const colliders = [];
 const roomBounds = [];   // {name,x1,z1,x2,z2}
 const wasteBags = [];
 const patients  = [];
 
+// ==============================
+// Helpers: walls, rooms, signs
+// ==============================
 function addWallBox(x, y, z, sx, sy, sz, color=0xdfeaf5) {
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.93, metalness:0 });
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
   mesh.position.set(x, y, z);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
-
+  // collider AABB
   const half = new THREE.Vector3(sx/2, sy/2, sz/2);
   colliders.push({ min:new THREE.Vector3(x,y,z).sub(half), max:new THREE.Vector3(x,y,z).add(half) });
   return mesh;
@@ -89,6 +93,7 @@ function makeSignTexture(text, sub="") {
   }
   const tex = new THREE.Texture(c); tex.needsUpdate = true; return tex;
 }
+
 function addWallSign(text, x, z, facing='north') {
   const tex = makeSignTexture(text);
   const mat = new THREE.MeshBasicMaterial({ map: tex });
@@ -100,6 +105,7 @@ function addWallSign(text, x, z, facing='north') {
   if (facing==='west' ){ sign.position.set(x-off, y, z); sign.rotation.y =  Math.PI/2; }
   scene.add(sign);
 }
+
 function addRoom(name, x1,z1,x2,z2, doorSide="south", doorCenter=0, doorWidth=2.4, height=3) {
   if(x1>x2) [x1,x2]=[x2,x1];
   if(z1>z2) [z1,z2]=[z2,z1];
@@ -108,7 +114,6 @@ function addRoom(name, x1,z1,x2,z2, doorSide="south", doorCenter=0, doorWidth=2.
   const wallT = 0.35, h = height;
   const color = 0xdfeaf5;
 
-  // Split wall with door gap on selected side
   const splitWall = (side) => {
     const isZ = (side==='south' || side==='north');
     const dc = (isZ? cx : cz) + doorCenter, half = doorWidth/2;
@@ -124,6 +129,7 @@ function addRoom(name, x1,z1,x2,z2, doorSide="south", doorCenter=0, doorWidth=2.
       if (botD>0.1) addWallBox(side==='west'? x1 : x2, h/2, z2 - botD/2, wallT, h, botD, color);
     }
   };
+
   (doorSide==="south") ? splitWall("south") : addWallBox(cx, h/2, z1, w, h, wallT, color);
   (doorSide==="north") ? splitWall("north") : addWallBox(cx, h/2, z2, w, h, wallT, color);
   (doorSide==="west" ) ? splitWall("west" ) : addWallBox(x1, h/2, cz, wallT, h, d, color);
@@ -136,12 +142,15 @@ function addRoom(name, x1,z1,x2,z2, doorSide="south", doorCenter=0, doorWidth=2.
   return { cx, cz, w, d, x1,z1,x2,z2, doorSide };
 }
 
+// ==============================
 // Props
+// ==============================
 function addDesk(x,z,w=4.8,d=1.8, h=0.9) {
   const mat = new THREE.MeshStandardMaterial({ color: 0xe1e7ef, roughness:0.95 });
   const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
   m.position.set(x, h/2, z); m.castShadow=m.receiveShadow=true; scene.add(m);
 }
+
 function addChair(x,z, rot=0){
   const group = new THREE.Group();
   const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.05,0.55), new THREE.MeshStandardMaterial({ color: 0xdfe7f1, roughness:0.95 }));
@@ -157,6 +166,7 @@ function addChair(x,z, rot=0){
   group.position.set(x,0,z); group.rotation.y = rot; scene.add(group);
   return group;
 }
+
 function addSymbiaCamera(cx, cz, yaw = 0) {
   const group = new THREE.Group(); group.position.set(cx,0,cz); group.rotation.y = yaw;
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.25, 18, 72), new THREE.MeshStandardMaterial({ color: 0xe9f2f8, roughness: 0.6 }));
@@ -173,6 +183,7 @@ function addSymbiaCamera(cx, cz, yaw = 0) {
   scene.add(group);
   return group;
 }
+
 function makeTrefoilTexture(){
   const c = document.createElement('canvas'); c.width=256; c.height=256;
   const ctx = c.getContext('2d');
@@ -188,6 +199,7 @@ function makeTrefoilTexture(){
   const tex = new THREE.Texture(c); tex.needsUpdate=true; return tex;
 }
 const trefoilTex = makeTrefoilTexture();
+
 function addWasteBag(x,z){
   const g = new THREE.Group(); g.position.set(x,0,z); g.rotation.y = Math.PI;
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.35,22,18), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness:0.8 }));
@@ -199,6 +211,7 @@ function addWasteBag(x,z){
   scene.add(g);
   return g;
 }
+
 function addPatient(x,z, facing=0) {
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8f0f8, roughness:0.95 });
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 24, 16), bodyMat); head.position.set(x, 1.65, z);
@@ -207,9 +220,9 @@ function addPatient(x,z, facing=0) {
   patients.push({ x, z, meshes:[head,torso], hot:false });
 }
 
-// ------------------------------
-// Pointer lock
-// ------------------------------
+// ==============================
+// Pointer lock & controls
+// ==============================
 const controls = new PointerLockControls(camera, document.body);
 function hideOverlay(){ overlay && (overlay.style.display='none'); }
 function showOverlay(){ overlay && (overlay.style.display='flex'); }
@@ -227,15 +240,17 @@ camera.lookAt(0, 1.6, 0);
 let moveF=0, moveB=0, moveL=0, moveR=0, sprint=0;
 const speed = 3.4, sprintBoost = 1.15;
 
-// ------------------------------
-// Movement & collisions
-// ------------------------------
+// ==============================
+// Movement + collisions
+// ==============================
 const player = { radius: 0.35 };
+
 function aabbCollidePointExpanded(aabb, p, r) {
   return (p.x > aabb.min.x - r && p.x < aabb.max.x + r &&
           p.y > aabb.min.y - r && p.y < aabb.max.y + r &&
           p.z > aabb.min.z - r && p.z < aabb.max.z + r);
 }
+
 function resolveCollisions(next) {
   for (const a of colliders) {
     if (aabbCollidePointExpanded(a, next, player.radius)) {
@@ -252,20 +267,21 @@ function resolveCollisions(next) {
   }
   return next;
 }
+
 function currentRoomName(px, pz) {
   for (const r of roomBounds) if (px>r.x1 && px<r.x2 && pz>r.z1 && pz<r.z2) return r.name;
   return "Main Corridor";
 }
 
-// ------------------------------
+// ==============================
 // Input
-// ------------------------------
+// ==============================
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (e.code==='KeyW') moveF=1;
   if (e.code==='KeyS') moveB=1;
-  if (e.code==='KeyA') moveL=1;
-  if (e.code==='KeyD') moveR=1;
+  if (e.code==='KeyA') moveL=1;  // A = left
+  if (e.code==='KeyD') moveR=1;  // D = right
   if (e.code==='ShiftLeft' || e.code==='ShiftRight') sprint=1;
 
   if (e.code==='KeyE') tryMarkContamination();
@@ -284,9 +300,9 @@ window.addEventListener('keyup', (e) => {
   if (e.code==='ShiftLeft' || e.code==='ShiftRight') sprint=0;
 });
 
-// ------------------------------
+// ==============================
 // Radiation model & gameplay
-// ------------------------------
+// ==============================
 const sources = []; // {pos,strength,isPatient,isContamination,found,marker}
 const rand = (a,b)=>a + Math.random()*(b-a);
 const pickN = (arr,n)=>arr.slice().sort(()=>Math.random()-0.5).slice(0,n);
@@ -295,7 +311,18 @@ let contaminationToFind = 3;
 const neededCountEl = document.getElementById("neededCount");
 if (neededCountEl) neededCountEl.textContent = contaminationToFind;
 
+function makeContaminationBlob(){
+  const g = new THREE.CircleGeometry(0.45, 18);
+  const m = new THREE.MeshBasicMaterial({ color: 0x22cc88, transparent:true, opacity:0.22 });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.rotation.x = -Math.PI/2;
+  const pin = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.45, 16), new THREE.MeshBasicMaterial({ color:0x22cc88 }));
+  pin.position.set(0, 0.25, 0); pin.visible = false; mesh.add(pin); mesh.pin = pin;
+  return mesh;
+}
+
 function seedScenario() {
+  // clear old markers (keep static meshes)
   for (const s of sources) { if (s.marker) scene.remove(s.marker); }
   sources.length = 0;
 
@@ -312,15 +339,14 @@ function seedScenario() {
     sources.push({ pos: wp.clone().setY(1.0), strength: rand(220,320), isPatient:false, isContamination:false, found:false, marker:null });
   }
 
-  // Mild hot: look for a room containing "Injection" (center)
+  // Mild hot: center of any "Injection" room
   const inj = roomBounds.find(r => /inject/i.test(r.name));
   if (inj) {
     const cx = (inj.x1+inj.x2)/2, cz=(inj.z1+inj.z2)/2;
     sources.push({ pos:new THREE.Vector3(cx,1.0,cz), strength:160, isPatient:false, isContamination:false, found:false, marker:null });
   }
 
-  // Contamination placement areas
-  // If an editor layout provided areas, use them; else use rooms + a simple corridor rect from built-in map (if defined)
+  // Areas for contamination
   const contamAreas = (window.__spawnAreas && window.__spawnAreas.length)
     ? window.__spawnAreas
     : (window.__builtinCorridorRect ? roomBounds.concat([window.__builtinCorridorRect]) : roomBounds);
@@ -360,12 +386,13 @@ function seedScenario() {
   let placed = 0;
   while (placed < contaminationToFind) {
     if (placeOneContam(false) || placeOneContam(true)) { placed++; continue; }
-    // last-resort fallback: center of overall extents
+    // fallback: center of overall extents
     const ext = getOverallExtents();
     const v = new THREE.Vector3((ext.x1+ext.x2)/2, 0.01, (ext.z1+ext.z2)/2);
     const blob = makeContaminationBlob(); blob.position.copy(v); scene.add(blob);
     sources.push({ pos:v.clone(), strength:rand(90,140), isPatient:false, isContamination:true, found:false, marker:blob });
-    placed++; console.warn('⚠️ Fallback contamination placed at center.');
+    placed++;
+    console.warn('⚠️ Fallback contamination placed at center.');
   }
 
   foundCount = 0;
@@ -377,34 +404,13 @@ function seedScenario() {
   camera.position.set(-30, 1.6, -18);
   controls.object.position.copy(camera.position);
 
-  // Debug
+  // Log spots
   const coords = sources.filter(s=>s.isContamination).map(s=>`(${s.pos.x.toFixed(1)}, ${s.pos.z.toFixed(1)})`);
   console.log('🟢 Contamination spots:', coords.join(', '));
 }
+
 function resetScenario(){ seedScenario(); }
 
-function makeContaminationBlob(){
-  const g = new THREE.CircleGeometry(0.45, 18);
-  const m = new THREE.MeshBasicMaterial({ color: 0x22cc88, transparent:true, opacity:0.22 });
-  const mesh = new THREE.Mesh(g, m);
-  mesh.rotation.x = -Math.PI/2;
-  const pin = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.45, 16), new THREE.MeshBasicMaterial({ color:0x22cc88 }));
-  pin.position.set(0, 0.25, 0); pin.visible = false; mesh.add(pin); mesh.pin = pin;
-  return mesh;
-}
-function flashHints(ms=2000){
-  let any=false;
-  for (const s of sources) if (s.isContamination && !s.found && s.marker){
-    any = true;
-    const mat = s.marker.material, oldOpacity=mat.opacity, oldScale = s.marker.scale.clone();
-    mat.opacity = 0.95; s.marker.scale.set(oldScale.x*1.8, oldScale.y, oldScale.z*1.8);
-    if (s.marker.pin) s.marker.pin.visible = true;
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.55,0.72,24), new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent:true, opacity:0.9, side:THREE.DoubleSide }));
-    ring.rotation.x = -Math.PI/2; ring.position.copy(s.marker.position); scene.add(ring);
-    setTimeout(()=>{ mat.opacity=oldOpacity; s.marker.scale.copy(oldScale); if (!s.found && s.marker.pin) s.marker.pin.visible=false; scene.remove(ring); }, ms);
-  }
-  setStatus(any ? "Hints shown (bright rings)." : "No remaining contamination.");
-}
 function nearestContamInfo(){
   let best = Infinity, bestS = null;
   for (const s of sources) if (s.isContamination && !s.found){
@@ -413,7 +419,9 @@ function nearestContamInfo(){
   }
   return bestS ? { dist: best, room: currentRoomName(bestS.pos.x, bestS.pos.z), pos: bestS.pos.clone() } : null;
 }
+
 let foundCount = 0;
+
 function updateFoundHud(){
   const el = document.getElementById('foundCount'); if (el) el.textContent = foundCount;
   const need = document.getElementById('neededCount'); if (need) need.textContent = contaminationToFind;
@@ -422,14 +430,21 @@ function updateFoundHud(){
     setStatus("All contamination found. Nice sweep!");
   }
 }
+
 function tryMarkContamination(){
   let did=false;
   for (const s of sources) if (s.isContamination && !s.found){
     const d = Math.hypot(camera.position.x - s.pos.x, camera.position.z - s.pos.z);
-    if (d < 1.25) { s.found=true; if (s.marker?.pin) s.marker.pin.visible=true; foundCount++; updateFoundHud(); setStatus("Marked contamination ✅"); did=true; }
+    if (d < 1.25) {
+      s.found=true;
+      if (s.marker?.pin) s.marker.pin.visible=true;
+      foundCount++; updateFoundHud(); setStatus("Marked contamination ✅");
+      did=true;
+    }
   }
   if (!did) setStatus("No contamination here. Sweep closer to the peak.");
 }
+
 function intensityAt(pos) {
   let sum = 0;
   for (const s of sources) {
@@ -440,10 +455,9 @@ function intensityAt(pos) {
   return sum;
 }
 
-// ------------------------------
-// Gauge (fixed size & HiDPI)
-// ------------------------------
-const gaugeCanvas = document.getElementById('gauge');
+// ==============================
+// Gauge
+// ==============================
 let gctx = null, smoothed = 0, geigerRate = 0;
 
 if (gaugeCanvas) {
@@ -453,6 +467,7 @@ if (gaugeCanvas) {
   gaugeCanvas.height = Math.floor(cssH * DPR);
   gctx = gaugeCanvas.getContext('2d'); gctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
+
 function drawGauge(value) {
   if (!gctx || !gaugeCanvas) return;
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
@@ -485,6 +500,7 @@ function drawGauge(value) {
   gctx.fillStyle="#0b2747"; gctx.font="800 34px system-ui"; gctx.textAlign="right";
   gctx.fillText((geigerRate|0) + " cps", w-24, h-20);
 }
+
 function generateFloorTexture(){
   const c = document.createElement('canvas'); c.width=256; c.height=256;
   const ctx = c.getContext('2d');
@@ -496,34 +512,43 @@ function generateFloorTexture(){
   return c;
 }
 
-// ------------------------------
+// ==============================
 // Audio clicks (Poisson)
-// ------------------------------
+// ==============================
 const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
 let clicksPaused = true, clickTimer = null;
+
 function playClick(){
   const t = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
   o.type="square"; o.frequency.value = 900 + Math.random()*150;
   g.gain.setValueAtTime(0.16, t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.03);
   o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+0.04);
 }
+
 function scheduleNextClick(){
   if (clicksPaused) return;
   const rate = Math.max(0.01, geigerRate);
   const u = Math.random(); const dt = -Math.log(1-u) / rate;
   clickTimer = setTimeout(()=>{ playClick(); scheduleNextClick(); }, dt*1000);
 }
+
 function resumeClicks(){ clicksPaused=false; if (audioCtx.state==='suspended') audioCtx.resume(); clearTimeout(clickTimer); scheduleNextClick(); }
 function pauseClicks(){ clicksPaused=true; clearTimeout(clickTimer); }
 
-// ------------------------------
-// HUD helpers
-// ------------------------------
-function setStatus(msg){ if (!statusMsg) return; statusMsg.textContent = msg; statusMsg.style.opacity = 1; clearTimeout(setStatus._t); setStatus._t = setTimeout(()=>{ statusMsg.style.opacity = 0.8; }, 1600); }
+// ==============================
+// HUD
+// ==============================
+function setStatus(msg){
+  if (!statusMsg) return;
+  statusMsg.textContent = msg;
+  statusMsg.style.opacity = 1;
+  clearTimeout(setStatus._t);
+  setStatus._t = setTimeout(()=>{ statusMsg.style.opacity = 0.8; }, 1600);
+}
 
-// ------------------------------
-// Animation loop (A/D right/left via cross product)
-// ------------------------------
+// ==============================
+// Main loop
+// ==============================
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta());
@@ -550,16 +575,16 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-// ------------------------------
+// ==============================
 // Built-in layout (kept as option)
-// ------------------------------
+// ==============================
 function buildBuiltinLayout(){
   // Outer boundary
   addWallBox(0, 1.5, -24, 80, 3, 0.5); // south
   addWallBox(0, 1.5,  24, 80, 3, 0.5); // north
   addWallBox(-40, 1.5, 0, 0.5, 3, 48); // west
   addWallBox( 40, 1.5, 0, 0.5, 3, 48); // east
-  // mark corridor rect so contamination can spawn there
+  // a corridor rect so contamination can spawn there too
   window.__builtinCorridorRect = { name: 'Main Corridor', x1: -38, z1: -4, x2: 38, z2: 4 };
 
   // TOP row (north)
@@ -595,37 +620,38 @@ function buildBuiltinLayout(){
   addPatient( 28,  -2, 0);
 }
 
-// ------------------------------
+// ==============================
 // Layout loader (JSON from editor)
-// ------------------------------
+// ==============================
 function getLayoutUrl() {
   const u = new URL(location.href);
   const q = u.searchParams.get('layout');
-  if (!q) return 'layout.json';      // default: try site-root layout.json
+  if (!q) return 'layout.json';               // default: try site-root layout.json
   if (q.toLowerCase()==='builtin') return null; // force built-in
-  return q;                          // custom path like layouts/mydept.json
+  return q;                                    // e.g. layouts/mydept.json
 }
+
 async function loadAndBuildLayout(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error('layout not found at ' + url);
   const layout = await res.json();
   buildLayoutFromJson(layout);
 }
+
 function buildLayoutFromJson(layout){
-  // Compute extents from rooms+zones
+  // extents
   const rects = [];
   (layout.rooms||[]).forEach(r=> rects.push({x1:Math.min(r.x1,r.x2), z1:Math.min(r.z1,r.z2), x2:Math.max(r.x1,r.x2), z2:Math.max(r.z1,r.z2)}));
   (layout.zones||[]).forEach(z=> rects.push({x1:Math.min(z.x1,z.x2), z1:Math.min(z.z1,z.z2), x2:Math.max(z.x1,z.x2), z2:Math.max(z.z1,z.z2)}));
-  if (!rects.length) { console.warn('Empty layout.json'); return; }
-  const ext = rects.reduce((a,b)=>({x1:Math.min(a.x1,b.x1),z1:Math.min(a.z1,b.z1),x2:Math.max(a.x2,b.x2),z2:Math.max(a.z2,b.z2)}));
+  if (rects.length) {
+    const ext = rects.reduce((a,b)=>({x1:Math.min(a.x1,b.x1),z1:Math.min(a.z1,b.z1),x2:Math.max(a.x2,b.x2),z2:Math.max(a.z2,b.z2)}));
+    addWallBox((ext.x1+ext.x2)/2, 1.5, ext.z1, Math.abs(ext.x2-ext.x1), 3, 0.5);
+    addWallBox((ext.x1+ext.x2)/2, 1.5, ext.z2, Math.abs(ext.x2-ext.x1), 3, 0.5);
+    addWallBox(ext.x1, 1.5, (ext.z1+ext.z2)/2, 0.5, 3, Math.abs(ext.z2-ext.z1));
+    addWallBox(ext.x2, 1.5, (ext.z1+ext.z2)/2, 0.5, 3, Math.abs(ext.z2-ext.z1));
+  }
 
-  // Boundary walls
-  addWallBox((ext.x1+ext.x2)/2, 1.5, ext.z1, Math.abs(ext.x2-ext.x1), 3, 0.5);
-  addWallBox((ext.x1+ext.x2)/2, 1.5, ext.z2, Math.abs(ext.x2-ext.x1), 3, 0.5);
-  addWallBox(ext.x1, 1.5, (ext.z1+ext.z2)/2, 0.5, 3, Math.abs(ext.z2-ext.z1));
-  addWallBox(ext.x2, 1.5, (ext.z1+ext.z2)/2, 0.5, 3, Math.abs(ext.z2-ext.z1));
-
-  // Rooms
+  // rooms
   for (const r of (layout.rooms||[])) {
     const w = Math.abs(r.x2-r.x1), d = Math.abs(r.z2-r.z1);
     const side = r.door?.side || 'south';
@@ -633,7 +659,8 @@ function buildLayoutFromJson(layout){
     let centerOff = 0;
     if (side==='south'||side==='north') centerOff = ((r.door?.pos ?? 0.5) - 0.5) * w;
     else                                centerOff = ((r.door?.pos ?? 0.5) - 0.5) * d;
-    const info = addRoom(r.name||'Room', r.x1, r.z1, r.x2, r.z2, side, centerOff, width, 3);
+    addRoom(r.name||'Room', r.x1, r.z1, r.x2, r.z2, side, centerOff, width, 3);
+
     const cx = (r.x1+r.x2)/2, cz=(r.z1+r.z2)/2;
     if (side==='south') addWallSign(r.name||'Room', cx, r.z1, 'south');
     if (side==='north') addWallSign(r.name||'Room', cx, r.z2, 'north');
@@ -641,7 +668,7 @@ function buildLayoutFromJson(layout){
     if (side==='east')  addWallSign(r.name||'Room', r.x2, cz, 'east');
   }
 
-  // Props
+  // props
   for (const p of (layout.props||[])) {
     if (p.type==='camera') addSymbiaCamera(p.x, p.z, p.rot||0);
     if (p.type==='wasteBag') wasteBags.push(addWasteBag(p.x, p.z));
@@ -650,11 +677,12 @@ function buildLayoutFromJson(layout){
     if (p.type==='patientSpawn') addPatient(p.x, p.z, p.rot||0);
   }
 
-  // Spawn areas (rooms + zones)
+  // spawn areas
   window.__spawnAreas = (layout.rooms||[]).concat(layout.zones||[]).map(a => ({
     name: a.name || 'Area', x1:a.x1, z1:a.z1, x2:a.x2, z2:a.z2
   }));
 }
+
 function getOverallExtents(){
   let ext=null;
   for (const r of roomBounds){
@@ -667,10 +695,9 @@ function getOverallExtents(){
   return ext;
 }
 
-// ------------------------------
-// Boot: load JSON if present, else built-in
-// Use ?layout=builtin to force built-in
-// ------------------------------
+// ==============================
+// Boot
+// ==============================
 (async () => {
   const layoutUrl = getLayoutUrl();
   try {
@@ -688,372 +715,17 @@ function getOverallExtents(){
   seedScenario();
   animate();
 })();
-  // Clear old sources (except patient meshes)
-  for (const s of sources) { if (s.marker) scene.remove(s.marker); }
-  sources.length = 0;
 
-  // Hot patients (about half)
-  const hotPatients = pickN(patients, Math.ceil(patients.length/2));
-  for (const p of patients) p.hot = hotPatients.includes(p);
-  for (const p of patients) {
-    if (p.hot) {
-      sources.push({
-        pos: new THREE.Vector3(p.x, 1.0, p.z),
-        strength: rand(80, 130),
-        isPatient: true, isContamination: false, found:false, marker:null
-      });
-    }
-  }
-
-  // Waste bags as hot sources
-  for (const bag of wasteBags) {
-    const wp = new THREE.Vector3();
-    bag.getWorldPosition(wp);
-    sources.push({ pos: wp.clone().setY(1.0), strength: rand(220, 320), isPatient:false, isContamination:false, found:false, marker:null });
-  }
-
-  // Injection room mildly hot (not contamination)
-  sources.push({ pos: new THREE.Vector3(5, 8.5, 1.0), strength: 160, isPatient:false, isContamination:false, found:false, marker:null });
-
-  // ---- Random contamination: STRICT first, RELAXED fallback, then GUARANTEE fill
-  const corridorRect = { name: 'Main Corridor', x1: -38, z1: -4, x2: 38, z2: 4 };
-  const contamAreas = roomBounds.concat([corridorRect]);
-
-  function randomPointInRect(rect, margin = 0.8) {
-    const x1 = rect.x1 + margin, x2 = rect.x2 - margin;
-    const z1 = rect.z1 + margin, z2 = rect.z2 - margin;
-    return new THREE.Vector3(rand(x1, x2), 0.01, rand(z1, z2));
-  }
-  function tooCloseToNonContam(p, min=2.2){
-    for (const s of sources){
-      if (!s.isContamination){ const d = Math.hypot(p.x - s.pos.x, p.z - s.pos.z); if (d < min) return true; }
-    }
-    return false;
-  }
-  function tooCloseToOtherContam(p, min=1.8){
-    for (const s of sources){
-      if (s.isContamination){ const d = Math.hypot(p.x - s.pos.x, p.z - s.pos.z); if (d < min) return true; }
-    }
-    return false;
-  }
-  function placeOneContam(relaxed=false){
-    let tries = 0;
-    while (tries++ < (relaxed? 160 : 120)) {
-      const area = contamAreas[Math.floor(Math.random() * contamAreas.length)];
-      const v = randomPointInRect(area, 0.9);
-      if (relaxed || (!tooCloseToNonContam(v) && !tooCloseToOtherContam(v))) {
-        const blob = makeContaminationBlob();
-        blob.position.copy(v);
-        scene.add(blob);
-        sources.push({ pos:v.clone(), strength:rand(90,140), isPatient:false, isContamination:true, found:false, marker:blob });
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // Try to place exactly 3
-  let placed = 0;
-  while (placed < contaminationToFind) {
-    // try strict
-    if (placeOneContam(false)) { placed++; continue; }
-    // try relaxed
-    if (placeOneContam(true))  { placed++; continue; }
-    // absolute fallback: put one in corridor center
-    const v = new THREE.Vector3(0, 0.01, 0);
-    const blob = makeContaminationBlob(); blob.position.copy(v); scene.add(blob);
-    sources.push({ pos:v.clone(), strength:rand(90,140), isPatient:false, isContamination:true, found:false, marker:blob });
-    placed++;
-    console.warn('⚠️ Fallback contamination placed at corridor center.');
-  }
-
-  // Update HUD target count to what we actually placed (always 3 now)
-  if (neededCountEl) neededCountEl.textContent = contaminationToFind;
-
-  foundCount = 0;
-  updateFoundHud();
-  setStatus("Sweep started — listen for the clicks.");
-  const vic = document.getElementById('victory'); if (vic) vic.style.display = 'none';
-  // reset player start
-  camera.position.set(-30, 1.6, -18);
-  controls.object.position.copy(camera.position);
-
-  // Debug log
-  const coords = sources.filter(s=>s.isContamination).map(s=>`(${s.pos.x.toFixed(1)}, ${s.pos.z.toFixed(1)})`);
-  console.log('🟢 Contamination spots:', coords.join(', '));
-}
-function resetScenario(){ seedScenario(); }
-
-/* Contamination visual (subtle) */
-function makeContaminationBlob(){
-  const g = new THREE.CircleGeometry(0.45, 18);
-  const m = new THREE.MeshBasicMaterial({ color: 0x22cc88, transparent:true, opacity:0.22 });
-  const mesh = new THREE.Mesh(g, m);
-  mesh.rotation.x = -Math.PI/2;
-  const pinGeo = new THREE.ConeGeometry(0.14, 0.45, 16);
-  const pinMat = new THREE.MeshBasicMaterial({ color:0x22cc88 });
-  const pin = new THREE.Mesh(pinGeo, pinMat);
-  pin.position.set(0, 0.25, 0);
-  pin.visible = false;
-  mesh.add(pin);
-  mesh.pin = pin;
-  return mesh;
-}
-
-/* Hint helpers (now very visible) */
-function flashHints(ms=2000){
-  let any = false;
-  for (const s of sources){
-    if (s.isContamination && !s.found && s.marker){
-      any = true;
-      const mat = s.marker.material;
-      s.marker.visible = true;
-      if (s.marker.pin) s.marker.pin.visible = true;
-      const oldOpacity = mat.opacity;
-      const oldScale = s.marker.scale.clone();
-      mat.opacity = 0.95;
-      s.marker.scale.set(oldScale.x*1.8, oldScale.y, oldScale.z*1.8);
-      // Add a quick pulsing outline ring (temporary)
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 24), new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent:true, opacity:0.9, side:THREE.DoubleSide }));
-      ring.rotation.x = -Math.PI/2; ring.position.copy(s.marker.position);
-      scene.add(ring);
-      setTimeout(() => {
-        mat.opacity = oldOpacity;
-        s.marker.scale.copy(oldScale);
-        if (!s.found && s.marker.pin) s.marker.pin.visible = false;
-        scene.remove(ring);
-      }, ms);
-    }
-  }
-  setStatus(any ? "Hints shown (look for bright green rings)." : "No remaining contamination.");
-}
-function nearestContamInfo(){
-  let best = Infinity, bestS = null;
-  for (const s of sources){
-    if (s.isContamination && !s.found){
-      const d = Math.hypot(camera.position.x - s.pos.x, camera.position.z - s.pos.z);
-      if (d < best) { best = d; bestS = s; }
-    }
-  }
-  if (!bestS) return null;
-  return { dist: best, room: currentRoomName(bestS.pos.x, bestS.pos.z), pos: bestS.pos.clone() };
-}
-
-/* ---------------------------------------------------
-   Geiger counter HUD (needle + clicks)
-// --------------------------------------------------- */
-const gaugeCanvas = document.getElementById('gauge');
-let gctx = null;
-let smoothed = 0;
-let geigerRate = 0; // cps
-
-if (gaugeCanvas) {
-  // CSS size (what you see)
-  const cssW = 420, cssH = 240;
-  gaugeCanvas.style.position = 'fixed';
-  gaugeCanvas.style.right    = '12px';
-  gaugeCanvas.style.bottom   = '12px';
-  gaugeCanvas.style.zIndex   = '10';
-  gaugeCanvas.style.width    = cssW + 'px';
-  gaugeCanvas.style.height   = cssH + 'px';
-  gaugeCanvas.style.pointerEvents = 'none';
-
-  // Device pixel ratio aware backing buffer
-  const DPR = Math.min(window.devicePixelRatio || 1, 2);
-  gaugeCanvas.width  = Math.floor(cssW * DPR);
-  gaugeCanvas.height = Math.floor(cssH * DPR);
-
-  gctx = gaugeCanvas.getContext('2d');
-  gctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-} else {
-  console.warn('#gauge canvas not found');
-}
-
-function drawGauge(value) {
-  if (!gctx || !gaugeCanvas) return;
-  const DPR = Math.min(window.devicePixelRatio || 1, 2);
-  const w = gaugeCanvas.width / DPR;
-  const h = gaugeCanvas.height / DPR;
-  gctx.clearRect(0,0,w,h);
-  gctx.fillStyle = "rgba(247,250,255,0.9)"; gctx.fillRect(0,0,w,h);
-  gctx.strokeStyle = "#b7c6d9"; gctx.lineWidth = 8; gctx.strokeRect(8,8,w-16,h-16);
-
-  const cx = w*0.5, cy = h*0.86, radius = Math.min(w,h)*0.41;
-  gctx.save(); gctx.translate(cx, cy);
-  const start = Math.PI*0.85, end = Math.PI*0.15;
-  gctx.beginPath(); gctx.arc(0,0,radius, start, end, true);
-  gctx.strokeStyle = "#6b8db3"; gctx.lineWidth = 4; gctx.stroke();
-
-  for(let i=0;i<=10;i++){
-    const t = i/10, ang = start + (end-start)*t;
-    const x1 = Math.cos(ang)*radius, y1 = Math.sin(ang)*radius;
-    const x2 = Math.cos(ang)*(radius-12), y2 = Math.sin(ang)*(radius-12);
-    gctx.beginPath(); gctx.moveTo(x1,y1); gctx.lineTo(x2,y2);
-    gctx.strokeStyle = i<7?"#a7bdd8": (i<9?"#f0c76b":"#ff7a7a");
-    gctx.lineWidth = 3; gctx.stroke();
-  }
-
-  gctx.fillStyle="#0d2a4d"; gctx.font="700 28px system-ui";
-  gctx.textAlign="center"; gctx.fillText("Geiger Counter", 0, -radius-18);
-  gctx.font="600 18px system-ui"; gctx.fillStyle="#2a7de1";
-  gctx.fillText("counts/sec (simulated)", 0, -radius+4);
-
-  const t = Math.max(0, Math.min(1, value));
-  const ang = start + (end-start)*t;
-  gctx.rotate(ang);
-  gctx.beginPath(); gctx.moveTo(-6, 12); gctx.lineTo(0, -radius+18); gctx.lineTo(6, 12);
-  gctx.closePath(); gctx.fillStyle="#2dd4bf"; gctx.fill();
-  gctx.restore();
-
-  gctx.fillStyle="#0b2747"; gctx.font="800 34px system-ui";
-  gctx.textAlign="right"; gctx.fillText((geigerRate|0) + " cps", w-24, h-20);
-}
+// ==============================
+// Utility fns used earlier
+// ==============================
 function generateFloorTexture(){
-  // light vinyl tiles
   const c = document.createElement('canvas'); c.width=256; c.height=256;
   const ctx = c.getContext('2d');
   ctx.fillStyle="#f4f8fd"; ctx.fillRect(0,0,256,256);
-  for(let y=0;y<16;y++){
-    for(let x=0;x<24;x++){
-      const v = (x+y)%2 ? 230: 240;
-      ctx.fillStyle = `rgb(${v},${v+3},${v+8})`;
-      ctx.fillRect(x*10,y*16,10,16);
-    }
+  for(let y=0;y<16;y++) for(let x=0;x<24;x++){
+    const v = (x+y)%2 ? 230: 240; ctx.fillStyle = `rgb(${v},${v+3},${v+8})`; ctx.fillRect(x*10,y*16,10,16);
   }
-  for(let i=0;i<500;i++){
-    const x = Math.random()*256, y=Math.random()*256, a=Math.random()*0.12;
-    ctx.fillStyle = `rgba(90,120,150,${a})`; ctx.fillRect(x,y,1,1);
-  }
+  for(let i=0;i<500;i++){ const x=Math.random()*256, y=Math.random()*256, a=Math.random()*0.12; ctx.fillStyle=`rgba(90,120,150,${a})`; ctx.fillRect(x,y,1,1); }
   return c;
 }
-
-/* Audio clicks (Poisson) */
-const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-let clicksPaused = true;
-let clickTimer = null;
-
-function playClick(){
-  const t = audioCtx.currentTime;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type="square"; o.frequency.value = 900 + Math.random()*150;
-  g.gain.setValueAtTime(0.16, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t+0.03);
-  o.connect(g).connect(audioCtx.destination);
-  o.start(t); o.stop(t+0.04);
-}
-function scheduleNextClick(){
-  if (clicksPaused) return;
-  const rate = Math.max(0.01, geigerRate);
-  const u = Math.random();
-  const dt = -Math.log(1-u) / rate;
-  clickTimer = setTimeout(()=>{ playClick(); scheduleNextClick(); }, dt*1000);
-}
-function resumeClicks(){
-  clicksPaused = false;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  clearTimeout(clickTimer);
-  scheduleNextClick();
-}
-function pauseClicks(){
-  clicksPaused = true;
-  clearTimeout(clickTimer);
-}
-
-/* Marking contamination */
-let foundCount = 0;
-function updateFoundHud(){
-  const el = document.getElementById('foundCount');
-  if (el) el.textContent = foundCount;
-  if (neededCountEl) neededCountEl.textContent = contaminationToFind;
-  if (foundCount >= contaminationToFind) {
-    const vic = document.getElementById('victory');
-    if (vic) vic.style.display = 'flex';
-    setStatus("All contamination found. Nice sweep!");
-  }
-}
-function tryMarkContamination(){
-  let did = false;
-  for (const s of sources) {
-    if (s.isContamination && !s.found) {
-      const dx = camera.position.x - s.pos.x;
-      const dz = camera.position.z - s.pos.z;
-      const d = Math.hypot(dx, dz);
-      if (d < 1.25) {
-        s.found = true;
-        if (s.marker && s.marker.pin) s.marker.pin.visible = true;
-        foundCount++;
-        updateFoundHud();
-        setStatus("Marked contamination ✅");
-        did = true;
-      }
-    }
-  }
-  if (!did) setStatus("No contamination here. Sweep closer to the peak.");
-}
-
-/* Radiation intensity at a point: sum s / (r^2 + sigma^2) */
-function intensityAt(pos) {
-  let sum = 0;
-  for (const s of sources) {
-    const dx = pos.x - s.pos.x, dy = pos.y - s.pos.y, dz = pos.z - s.pos.z;
-    const dist2 = dx*dx + dy*dy + dz*dz;
-    sum += s.strength / (dist2 + 0.25);
-  }
-  return sum;
-}
-
-/* HUD helpers */
-function setStatus(msg){
-  if (!statusMsg) return;
-  statusMsg.textContent = msg;
-  statusMsg.style.opacity = 1;
-  clearTimeout(setStatus._t);
-  setStatus._t = setTimeout(()=>{ statusMsg.style.opacity = 0.8; }, 1600);
-}
-
-/* ---------------------------------------------------
-   Main loop (A/D fixed via cross product)
-// --------------------------------------------------- */
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(0.05, clock.getDelta());
-
-  // movement
-  const dir = new THREE.Vector3();
-  controls.getDirection(dir); // forward
-  dir.y = 0; dir.normalize();
-
-  const right = new THREE.Vector3().copy(dir).cross(new THREE.Vector3(0,1,0)).normalize();
-
-  let v = speed * (1 + sprintBoost * sprint);
-  let move = new THREE.Vector3();
-  move.addScaledVector(dir,   (moveF - moveB) * v * dt);
-  move.addScaledVector(right, (moveR - moveL) * v * dt); // D=right, A=left
-
-  const next = controls.object.position.clone().add(move);
-  next.y = 1.6;
-  resolveCollisions(next);
-  controls.object.position.copy(next);
-  camera.position.copy(next);
-
-  // radiation
-  const raw = intensityAt(camera.position);
-  const cps = 6 + raw * 0.28 + (Math.random()*2-1)*0.6;
-  geigerRate = Math.max(0, cps);
-  const gaugeMax = 220;
-  const target = Math.min(1, geigerRate / gaugeMax);
-  smoothed += (target - smoothed) * (1 - Math.pow(0.04, dt*60));
-  drawGauge(smoothed);
-
-  // room label
-  const rn = document.getElementById('roomName');
-  if (rn) rn.textContent = currentRoomName(camera.position.x, camera.position.z);
-
-  renderer.render(scene, camera);
-}
-
-/* Boot */
-seedScenario();
-animate();
-
