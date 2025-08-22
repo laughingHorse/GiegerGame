@@ -12,6 +12,15 @@ const startBtn  = document.getElementById('startBtn');
 const statusMsg = document.getElementById('statusMsg');
 const gaugeCanvas = document.getElementById('gauge');
 
+// Spawn point (updated after we build a layout)
+let spawnPoint = new THREE.Vector3(-30, 1.6, -18);
+function setSpawnInsideRect(rect){
+  const cx = (Math.min(rect.x1,rect.x2) + Math.max(rect.x1,rect.x2)) / 2;
+  const cz = (Math.min(rect.z1,rect.z2) + Math.max(rect.z1,rect.z2)) / 2;
+  spawnPoint.set(cx, 1.6, cz);
+}
+
+
 // ==============================
 // Three.js setup
 // ==============================
@@ -400,9 +409,10 @@ function seedScenario() {
   setStatus("Sweep started — listen for the clicks.");
   const vic = document.getElementById('victory'); if (vic) vic.style.display = 'none';
 
-  // Reset player start
-  camera.position.set(-30, 1.6, -18);
-  controls.object.position.copy(camera.position);
+  // Reset player start (inside the layout)
+  camera.position.copy(spawnPoint);
+  controls.object.position.copy(spawnPoint);
+
 
   // Log spots
   const coords = sources.filter(s=>s.isContamination).map(s=>`(${s.pos.x.toFixed(1)}, ${s.pos.z.toFixed(1)})`);
@@ -586,6 +596,9 @@ function buildBuiltinLayout(){
   addWallBox( 40, 1.5, 0, 0.5, 3, 48); // east
   // a corridor rect so contamination can spawn there too
   window.__builtinCorridorRect = { name: 'Main Corridor', x1: -38, z1: -4, x2: 38, z2: 4 };
+  // Start in the main corridor
+setSpawnInsideRect(window.__builtinCorridorRect);
+
 
   // TOP row (north)
   addRoom("Waste Room",    -38,  6, -28, 23, "south"); addWallSign("Waste Room", -33, 6.0, "south");
@@ -650,6 +663,38 @@ function buildLayoutFromJson(layout){
     addWallBox(ext.x1, 1.5, (ext.z1+ext.z2)/2, 0.5, 3, Math.abs(ext.z2-ext.z1));
     addWallBox(ext.x2, 1.5, (ext.z1+ext.z2)/2, 0.5, 3, Math.abs(ext.z2-ext.z1));
   }
+// Choose a spawn inside the layout:
+// 1) a zone named like "corridor" / "reception" / "waiting" if present,
+// 2) otherwise the largest zone,
+// 3) otherwise the largest room,
+// 4) fallback: overall extents center.
+(function chooseSpawn(){
+  const zones = (layout.zones || []).slice();
+  const rooms = (layout.rooms || []).slice();
+
+  const byAreaDesc = (a,b) => {
+    const aa = Math.abs((a.x2 - a.x1) * (a.z2 - a.z1));
+    const bb = Math.abs((b.x2 - b.x1) * (b.z2 - b.z1));
+    return bb - aa;
+  };
+
+  let spawnRect = null;
+
+  // Prefer specifically-named public areas
+  const prefer = zones.find(z => /corridor|reception|waiting/i.test(z.name||''));
+  if (prefer) spawnRect = prefer;
+
+  // Next: biggest zone
+  if (!spawnRect && zones.length) spawnRect = zones.sort(byAreaDesc)[0];
+
+  // Next: biggest room
+  if (!spawnRect && rooms.length) spawnRect = rooms.sort(byAreaDesc)[0];
+
+  // Fallback: overall extents
+  if (!spawnRect) spawnRect = ext;
+
+  setSpawnInsideRect(spawnRect);
+})();
 
   // rooms
   for (const r of (layout.rooms||[])) {
@@ -715,5 +760,6 @@ function getOverallExtents(){
   seedScenario();
   animate();
 })();
+
 
 
