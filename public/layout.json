@@ -1,0 +1,134 @@
+{
+  "unitsPerMeter": 1,
+  "rooms": [
+    {
+      "id": "dreox4k",
+      "name": "Clinic Room 1",
+      "x1": -25,
+      "z1": -6.5,
+      "x2": -19,
+      "z2": 1.5,
+      "door": {
+        "side": "east",
+        "pos": 0.21181463274793377,
+        "width": 2.4
+      }
+    },
+    {
+      "id": "7fifuti",
+      "name": "Test Room",
+      "x1": -11,
+      "z1": -6.5,
+      "x2": -4,
+      "z2": 1.5,
+      "door": {
+        "side": "west",
+        "pos": 0.7025171120867768,
+        "width": 2.4
+      }
+    }
+  ],
+  "zones": [
+    {
+      "id": "12ylk2j",
+      "name": "Zone",
+      "x1": -19,
+      "z1": -6.5,
+      "x2": -11,
+      "z2": 1.5
+    }
+  ],
+  "props": [
+    {
+      "id": "43ser0k",
+      "type": "desk",
+      "x": -22.5,
+      "z": -4,
+      "rot": 0
+    },
+    {
+      "id": "ux6xytm",
+      "type": "camera",
+      "x": -8,
+      "z": -4,
+      "rot": 0
+    },
+    {
+      "id": "4agjrlz",
+      "type": "desk",
+      "x": -16,
+      "z": -1.5,
+      "rot": 0
+    },
+    {
+      "id": "vo7qigp",
+      "type": "chair",
+      "x": -16.5,
+      "z": -0.5,
+      "rot": 0
+    },
+    {
+      "id": "t1a0y9z",
+      "type": "chair",
+      "x": -15.5,
+      "z": -0.5,
+      "rot": 0
+    },
+    {
+      "id": "1yhso57",
+      "type": "chair",
+      "x": -14.5,
+      "z": -0.5,
+      "rot": 0
+    },
+    {
+      "id": "8qjrdsq",
+      "type": "patientSpawn",
+      "x": -8,
+      "z": -1.5,
+      "rot": 0
+    },
+    {
+      "id": "177pevx",
+      "type": "patientSpawn",
+      "x": -5.5,
+      "z": -1.5,
+      "rot": 0
+    },
+    {
+      "id": "xgv9k84",
+      "type": "patientSpawn",
+      "x": -14,
+      "z": -5,
+      "rot": 0
+    },
+    {
+      "id": "d31qhlc",
+      "type": "patientSpawn",
+      "x": -16.5,
+      "z": -5.5,
+      "rot": 0
+    },
+    {
+      "id": "mh4xrx6",
+      "type": "wasteBag",
+      "x": -6,
+      "z": -5.5,
+      "rot": 0
+    },
+    {
+      "id": "msmv7yw",
+      "type": "wasteBag",
+      "x": -5,
+      "z": -5.5,
+      "rot": 0
+    },
+    {
+      "id": "r8nn1u1",
+      "type": "wasteBag",
+      "x": -5,
+      "z": -4.5,
+      "rot": 0
+    }
+  ]
+}
