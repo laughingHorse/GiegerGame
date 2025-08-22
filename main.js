@@ -53,16 +53,35 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 scene.add(sun);
 
-// Floor (vinyl)
+// --- Auto-sizing floor that fits the layout ---
+let floorMesh = null;
+const FLOOR_TILE_M = 3; // one texture repeat per ~3 meters
+
 const floorTex = new THREE.Texture(generateFloorTexture());
 floorTex.needsUpdate = true;
 floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
-floorTex.repeat.set(11, 8);
+
 const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.96, metalness: 0 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(90, 60), floorMat);
-floor.rotation.x = -Math.PI/2;
-floor.receiveShadow = true;
-scene.add(floor);
+
+function buildOrResizeFloor(ext){
+  // ext = {x1,z1,x2,z2}
+  const cx = (ext.x1 + ext.x2) / 2;
+  const cz = (ext.z1 + ext.z2) / 2;
+  const w = Math.max(10, Math.abs(ext.x2 - ext.x1) + 6); // margin around outer walls
+  const d = Math.max(10, Math.abs(ext.z2 - ext.z1) + 6);
+
+  if (floorMesh) scene.remove(floorMesh);
+  floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat);
+  floorMesh.rotation.x = -Math.PI/2;
+  floorMesh.position.set(cx, 0, cz);
+  floorMesh.receiveShadow = true;
+
+  // Keep tile size consistent in meters
+  floorTex.repeat.set(w / FLOOR_TILE_M, d / FLOOR_TILE_M);
+
+  scene.add(floorMesh);
+}
+
 
 // ==============================
 // Geometry registries
@@ -616,6 +635,9 @@ setSpawnInsideRect(window.__builtinCorridorRect);
   addRoom("Control Room",   12, -23,  20,  -8, "north"); addWallSign("Control Room", 16, -8.0, "north");
   addRoom("Camera Room 3",  22, -23,  38,  -8, "north"); addWallSign("Camera Room 3", 30, -8.0, "north");
 
+  const ext = getOverallExtents(); // you already have this helper
+  buildOrResizeFloor(ext);
+
   // Built-in props
   addDesk(-31, -18, 6, 1.8);
   addDesk(-14, -15, 3.5, 1.6);
@@ -660,6 +682,7 @@ function buildLayoutFromJson(layout){
   (layout.zones||[]).forEach(z=> rects.push({x1:Math.min(z.x1,z.x2), z1:Math.min(z.z1,z.z2), x2:Math.max(z.x1,z.x2), z2:Math.max(z.z1,z.z2)}));
   if (rects.length) {
     const ext = rects.reduce((a,b)=>({x1:Math.min(a.x1,b.x1),z1:Math.min(a.z1,b.z1),x2:Math.max(a.x2,b.x2),z2:Math.max(a.z2,b.z2)}));
+    buildOrResizeFloor(ext);
     addWallBox((ext.x1+ext.x2)/2, 1.5, ext.z1, Math.abs(ext.x2-ext.x1), 3, 0.5);
     addWallBox((ext.x1+ext.x2)/2, 1.5, ext.z2, Math.abs(ext.x2-ext.x1), 3, 0.5);
     addWallBox(ext.x1, 1.5, (ext.z1+ext.z2)/2, 0.5, 3, Math.abs(ext.z2-ext.z1));
@@ -762,6 +785,7 @@ function getOverallExtents(){
   seedScenario();
   animate();
 })();
+
 
 
 
