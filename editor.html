@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NucMed Layout Editor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html,body { margin:0; height:100%; background:#0b1220; color:#e8f1ff; font-family:system-ui, -apple-system, Segoe UI, Arial; }
+    #bar {
+      position:fixed; inset:auto 0 0 0; display:flex; gap:8px; padding:10px 12px;
+      background:#0d1628cc; border-top:1px solid #22324d; align-items:center; flex-wrap:wrap;
+    }
+    #bar button, #bar select, #bar input[type="number"] {
+      background:#152238; color:#dfeaff; border:1px solid #2a3b5e; border-radius:6px; padding:8px 10px; font-weight:600;
+    }
+    #bar button.active { outline:2px solid #2a7de1; }
+    #canvas { display:block; width:100vw; height:100vh; }
+    #hud {
+      position:fixed; top:10px; left:10px; background:#0d1628cc; border:1px solid #22324d;
+      padding:8px 10px; border-radius:8px; font-size:14px; line-height:1.3;
+    }
+    #fileInput { display:none; }
+    .kbd { padding:2px 6px; border:1px solid #2a3b5e; border-radius:4px; background:#111a2c; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">
+    <div><b>Layout Editor</b></div>
+    <div>Left-drag: draw/move • Right-click: delete • <span class="kbd">Esc</span>: cancel</div>
+  </div>
+
+  <div id="bar">
+    <span>Tool:</span>
+    <button data-tool="room" class="active">Room</button>
+    <button data-tool="zone">Zone (corridor)</button>
+    <button data-tool="door">Door</button>
+    <button data-tool="select">Select/Move</button>
+    <span style="margin-left:12px">Prop:</span>
+    <select id="propType">
+      <option value="camera">Gamma Camera</option>
+      <option value="wasteBag">Waste Bag</option>
+      <option value="chair">Chair</option>
+      <option value="desk">Desk</option>
+      <option value="patientSpawn">Patient Spawn</option>
+    </select>
+    <button data-tool="prop">Place Prop</button>
+    <span style="margin-left:12px">Door width (m):</span>
+    <input id="doorWidth" type="number" min="0.8" max="4" step="0.1" value="2.4" />
+
+    <span style="flex:1"></span>
+    <button id="btnExport">Export JSON</button>
+    <button id="btnImport">Import JSON</button>
+    <input id="fileInput" type="file" accept="application/json" />
+  </div>
+
+  <script src="editor.js" type="module"></script>
+</body>
+</html>
